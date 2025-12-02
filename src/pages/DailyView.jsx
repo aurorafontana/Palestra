@@ -7,6 +7,7 @@ import { getLastLog } from '../db/history';
 import { getWeekNumber } from '../utils/dateUtils';
 import { ExerciseForm } from '../components/ExerciseForm';
 import { ROUTINES, ROUTINE_LABELS } from '../data/routines';
+import { EXERCISE_IMAGES, DEFAULT_EXERCISE_IMAGE } from '../data/exerciseImages';
 
 export function DailyView() {
   const today = new Date();
@@ -14,9 +15,9 @@ export function DailyView() {
   const [isAdding, setIsAdding] = useState(false);
   const [historyData, setHistoryData] = useState({}); // Map of exerciseName -> lastLog
 
-  // Get current workout for today
+  // Get current workout for today (excluding completed ones)
   const workout = useLiveQuery(async () => {
-    return await db.workouts.where('date').equals(todayStr).first();
+    return await db.workouts.where('date').equals(todayStr).filter(w => w.status !== 'completed').first();
   });
 
   const logs = useLiveQuery(async () => {
@@ -84,8 +85,10 @@ export function DailyView() {
 
   const handleCompleteSession = async () => {
     if (!workout) return;
+    // Save session (mark as completed)
     await db.workouts.update(workout.id, { status: 'completed' });
-    alert('Sessione completata e salvata!');
+    // The updated query will automatically filter out this completed workout,
+    // causing the UI to reset to the routine selector (menu).
   };
 
   const handleReset = async () => {
@@ -166,15 +169,17 @@ export function DailyView() {
           {logs.map(log => {
             const lastLog = historyData[log.exerciseName];
             const lastWeight = lastLog?.lastWeight;
+            const exerciseImage = EXERCISE_IMAGES[log.exerciseName] || DEFAULT_EXERCISE_IMAGE;
 
             return (
               <div key={log.id} className="bg-gray-800/50 rounded-2xl overflow-hidden border border-gray-800 shadow-sm">
                 {/* Exercise Header */}
                 <div className="p-4 border-b border-gray-700/50 flex gap-4">
                   <img
-                    src={`https://placehold.co/100x100/1f2937/white?text=${log.exerciseName.charAt(0)}`}
+                    src={exerciseImage}
                     alt={log.exerciseName}
                     className="w-16 h-16 rounded-lg object-cover bg-gray-700"
+                    onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_EXERCISE_IMAGE; }}
                   />
                   <div className="flex-1">
                     <h3 className="font-bold text-lg text-white mb-1">{log.exerciseName}</h3>
